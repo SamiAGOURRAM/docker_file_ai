@@ -1,9 +1,0 @@
-numpy
-pandas
-matplotlib
-seaborn
-requests
-tqdm
-scikit-learn
-imbalanced-learn
-tensorflow

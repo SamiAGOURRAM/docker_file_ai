@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classification - Earthquake Prediction</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .container {
+            max-width: 800px;
+            margin-top: 30px;
+        }
+        .card {
+            margin-bottom: 20px;
+        }
+        #resultCard {
+            display: none;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .sampling-badge {
+            font-size: 0.8rem;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">Earthquake Prediction</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/classification">Classification</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/configuration">Configuration</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h2>Earthquake Classification</h2>
+            </div>
+            <div class="card-body">
+                <!-- Model Selection Card -->
+                <div class="card mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5>Model Selection</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info" id="activeModelInfo">
+                            <span th:if="${modelsInfo != null && modelsInfo.active_model != null}">
+                                Active Model: <strong th:text="${modelsInfo.active_model.type}">CNN</strong>
+                                <span class="badge bg-warning text-dark sampling-badge" 
+                                      th:text="${modelsInfo.active_model.sampling}">original</span>
+                            </span>
+                            <span th:unless="${modelsInfo != null && modelsInfo.active_model != null}">
+                                No active model selected
+                            </span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="modelTypeSelect" class="form-label">Select Model Type:</label>
+                            <select class="form-select" id="modelTypeSelect">
+                                <option value="">Choose a model type...</option>
+                                <option value="MLP">MLP (Multi-Layer Perceptron)</option>
+                                <option value="CNN">CNN (Convolutional Neural Network)</option>
+                                <option value="RNN">RNN (Recurrent Neural Network)</option>
+                                <option value="GRU">GRU (Gated Recurrent Unit)</option>
+                                <option value="RandomForest">Random Forest</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="samplingTechniqueSelect" class="form-label">Select Sampling Technique:</label>
+                            <select class="form-select" id="samplingTechniqueSelect">
+                                <option value="">Choose a sampling technique...</option>
+                                <option value="original">Original (No Resampling)</option>
+                                <option value="smote">SMOTE (Oversampling)</option>
+                                <option value="under">Undersampling</option>
+                                <option value="combined">Combined (SMOTE + Undersampling)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3" id="modelMetricsContainer" style="display: none;">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h6>Model Metrics</h6>
+                                </div>
+                                <div class="card-body" id="modelMetrics">
+                                    <!-- Metrics will be displayed here -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button id="activateModelBtn" class="btn btn-secondary">Activate Selected Model</button>
+                        <div id="modelActivationStatus"></div>
+                    </div>
+                </div>
+                
+                <!-- Prediction Card -->
+                <div class="mb-4">
+                    <h5>Upload Earthquake Features</h5>
+                    <p>Upload a JSON file with earthquake time series data or use the test data buttons below.</p>
+                    
+                    <div class="mb-3">
+                        <label for="jsonFile" class="form-label">JSON File</label>
+                        <input class="form-control" type="file" id="jsonFile" accept=".json">
+                    </div>
+                    
+                    <div class="d-flex gap-2 mb-3">
+                        <button id="testPositive" class="btn btn-outline-success">Test Positive Example</button>
+                        <button id="testNegative" class="btn btn-outline-warning">Test Negative Example</button>
+                    </div>
+                    
+                    <button id="submitBtn" class="btn btn-primary">Submit for Classification</button>
+                    <div class="mt-2" id="processingIndicator" style="display: none;">
+                        <div class="loader"></div> Processing...
+                    </div>
+                </div>
+                
+                <div id="resultCard" class="card mt-4">
+                    <div class="card-header">
+                        <h5>Classification Result</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="resultContent"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const jsonFileInput = document.getElementById('jsonFile');
+            const submitBtn = document.getElementById('submitBtn');
+            const testPositiveBtn = document.getElementById('testPositive');
+            const testNegativeBtn = document.getElementById('testNegative');
+            const resultCard = document.getElementById('resultCard');
+            const resultContent = document.getElementById('resultContent');
+            const processingIndicator = document.getElementById('processingIndicator');
+            const modelTypeSelect = document.getElementById('modelTypeSelect');
+            const samplingTechniqueSelect = document.getElementById('samplingTechniqueSelect');
+            const activateModelBtn = document.getElementById('activateModelBtn');
+            const modelActivationStatus = document.getElementById('modelActivationStatus');
+            const activeModelInfo = document.getElementById('activeModelInfo');
+            const modelMetricsContainer = document.getElementById('modelMetricsContainer');
+            const modelMetrics = document.getElementById('modelMetrics');
+            
+            // Store models data
+            let modelsData = [];
+            
+            // Fetch available models and store them
+            fetch('/api/models')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.models) {
+                        modelsData = data.models;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching models:', error);
+                });
+            
+            // Update model metrics when selections change
+            function updateModelMetrics() {
+                const selectedType = modelTypeSelect.value;
+                const selectedSampling = samplingTechniqueSelect.value;
+                
+                if (!selectedType || !selectedSampling) {
+                    modelMetricsContainer.style.display = 'none';
+                    return;
+                }
+                
+                // Find the matching model in our data
+                const model = modelsData.find(m => 
+                    m.type === selectedType && m.sampling === selectedSampling
+                );
+                
+                if (model) {
+                    modelMetricsContainer.style.display = 'block';
+                    modelMetrics.innerHTML = `
+                        <table class="table table-striped table-sm">
+                            <tbody>
+                                <tr>
+                                    <th>Accuracy</th>
+                                    <td>${(model.accuracy * 100).toFixed(2)}%</td>
+                                </tr>
+                                <tr>
+                                    <th>F1 Score</th>
+                                    <td>${(model.f1_score * 100).toFixed(2)}%</td>
+                                </tr>
+                                <tr>
+                                    <th>Precision</th>
+                                    <td>${(model.precision * 100).toFixed(2)}%</td>
+                                </tr>
+                                <tr>
+                                    <th>Recall</th>
+                                    <td>${(model.recall * 100).toFixed(2)}%</td>
+                                </tr>
+                                <tr>
+                                    <th>ROC AUC</th>
+                                    <td>${(model.roc_auc * 100).toFixed(2)}%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    `;
+                } else {
+                    modelMetricsContainer.style.display = 'block';
+                    modelMetrics.innerHTML = `
+                        <div class="alert alert-warning">
+                            No data available for ${selectedType} with ${selectedSampling} sampling
+                        </div>
+                    `;
+                }
+            }
+            
+            // Event listeners for selection changes
+            modelTypeSelect.addEventListener('change', updateModelMetrics);
+            samplingTechniqueSelect.addEventListener('change', updateModelMetrics);
+            
+            // Activate model button
+            activateModelBtn.addEventListener('click', function() {
+                const selectedType = modelTypeSelect.value;
+                const selectedSampling = samplingTechniqueSelect.value;
+                
+                if (!selectedType || !selectedSampling) {
+                    showModelStatus('Please select a model type and sampling technique', 'danger');
+                    return;
+                }
+                
+                // Find if this model exists in our data
+                const modelExists = modelsData.some(m => 
+                    m.type === selectedType && m.sampling === selectedSampling
+                );
+                
+                if (!modelExists) {
+                    showModelStatus('This model combination is not available', 'danger');
+                    return;
+                }
+                
+                // Show loading
+                showModelStatus('Activating model...', 'info');
+                
+                // Send activation request
+                fetch('/api/models/activate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        type: selectedType,
+                        sampling: selectedSampling
+                    })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.status === 'success') {
+                        showModelStatus('Model activated successfully!', 'success');
+                        activeModelInfo.innerHTML = `
+                            Active Model: <strong>${selectedType}</strong>
+                            <span class="badge bg-warning text-dark sampling-badge">${selectedSampling}</span>
+                        `;
+                        
+                        // Refresh the page after 2 seconds to reflect the change
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
+                    } else {
+                        showModelStatus(`Error: ${result.error || 'Failed to activate model'}`, 'danger');
+                    }
+                })
+                .catch(error => {
+                    showModelStatus(`Error: ${error.message}`, 'danger');
+                });
+            });
+            
+            // Function to show model activation status
+            function showModelStatus(message, type) {
+                modelActivationStatus.innerHTML = `
+                    <div class="alert alert-${type} mt-2">
+                        ${message}
+                    </div>
+                `;
+            }
+            
+            // Submit handler
+            submitBtn.addEventListener('click', function() {
+                let data = null;
+                
+                if (jsonFileInput.files.length > 0) {
+                    const file = jsonFileInput.files[0];
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        try {
+                            data = JSON.parse(e.target.result);
+                            submitPrediction(data);
+                        } catch (error) {
+                            showError('Invalid JSON file: ' + error.message);
+                        }
+                    };
+                    
+                    reader.readAsText(file);
+                } else {
+                    showError('Please upload a JSON file or use a test example');
+                }
+            });
+            
+            // Test positive example
+            testPositiveBtn.addEventListener('click', function() {
+                fetch('/test/positive_test.json')
+                    .then(response => response.json())
+                    .then(data => {
+                        submitPrediction(data);
+                    })
+                    .catch(error => {
+                        showError('Error loading test data: ' + error.message);
+                    });
+            });
+            
+            // Test negative example
+            testNegativeBtn.addEventListener('click', function() {
+                fetch('/test/negative_test.json')
+                    .then(response => response.json())
+                    .then(data => {
+                        submitPrediction(data);
+                    })
+                    .catch(error => {
+                        showError('Error loading test data: ' + error.message);
+                    });
+            });
+            
+            // Function to submit prediction
+            function submitPrediction(data) {
+                // Show processing indicator
+                processingIndicator.style.display = 'block';
+                resultCard.style.display = 'none';
+                
+                // Send to API
+                fetch('/api/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(response => response.json())
+                .then(result => {
+                    processingIndicator.style.display = 'none';
+                    displayResult(result);
+                })
+                .catch(error => {
+                    processingIndicator.style.display = 'none';
+                    showError('Error: ' + error.message);
+                });
+            }
+            
+            // Function to display result
+            function displayResult(result) {
+                resultCard.style.display = 'block';
+                
+                if (result.status === 'error') {
+                    showError(result.error || 'An error occurred');
+                    return;
+                }
+                
+                const isMajor = result.class === 1;
+                const cardClass = isMajor ? 'bg-danger text-white' : 'bg-success text-white';
+                const probability = (result.probability * 100).toFixed(2);
+                
+                resultContent.innerHTML = `
+                    <div class="alert ${cardClass}">
+                        <h4>${result.prediction}</h4>
+                        <p>Confidence: ${probability}%</p>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <h5>Prediction Details:</h5>
+                        <ul class="list-group">
+                            <li class="list-group-item">Class: ${result.class} (${isMajor ? 'Major' : 'Minor'})</li>
+                            <li class="list-group-item">Probability: ${probability}%</li>
+                            <li class="list-group-item">
+                                Model: ${result.model.type} 
+                                <span class="badge bg-warning text-dark">${result.model.sampling}</span>
+                            </li>
+                        </ul>
+                    </div>
+                `;
+            }
+            
+            // Function to show error
+            function showError(message) {
+                resultCard.style.display = 'block';
+                resultContent.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h5>Error</h5>
+                        <p>${message}</p>
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

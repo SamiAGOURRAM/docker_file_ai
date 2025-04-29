@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Python ML service - not exposed to the outside world
+  python-service:
+    build:
+      context: ./python-service
+      dockerfile: Dockerfile
+    container_name: earthquake-python-service
+    volumes:
+      - ./python-service/models:/app/models
+      - ./python-service/config.json:/app/config.json
+      - ./python-service/scaler.joblib:/app/scaler.joblib
+    networks:
+      - earthquake-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Spring Boot web application - exposed to the outside world
+  spring-boot-service:
+    build:
+      context: ./spring-boot-service
+      dockerfile: Dockerfile
+    container_name: earthquake-spring-boot-service
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./test:/app/test
+    depends_on:
+      python-service:
+        condition: service_healthy
+    networks:
+      - earthquake-network
+    restart: unless-stopped
+
+networks:
+  earthquake-network:
+    driver: bridge

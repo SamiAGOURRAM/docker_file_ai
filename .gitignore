@@ -1,0 +1,68 @@
+# Model files
+*.h5
+*.joblib
+*.pkl
+*.model
+*.json
+
+# Earthquake model exports
+python-service/models/
+earthquake_models.zip
+export/
+
+# Python files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+.env
+.venv
+venv/
+ENV/
+
+# Java/Maven files
+target/
+.classpath
+.project
+.settings/
+.idea/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+.springBeans
+*.jar
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Logs and databases
+*.log
+*.sqlite
+*.db
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

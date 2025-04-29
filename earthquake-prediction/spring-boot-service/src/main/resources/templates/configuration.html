@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Configuration - Earthquake Prediction</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .container {
+            max-width: 800px;
+            margin-top: 30px;
+        }
+        .card {
+            margin-bottom: 20px;
+        }
+        .model-card {
+            transition: transform 0.2s;
+        }
+        .model-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .model-card.active {
+            border: 2px solid #0d6efd;
+        }
+        .sampling-badge {
+            font-size: 0.85rem;
+        }
+        .metric-bar-container {
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            margin-top: 5px;
+            margin-bottom: 10px;
+        }
+        .metric-bar {
+            height: 100%;
+            border-radius: 10px;
+            text-align: center;
+            color: white;
+            font-size: 0.75rem;
+            line-height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">Earthquake Prediction</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/classification">Classification</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/configuration">Configuration</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h2>Model Configuration</h2>
+            </div>
+            <div class="card-body">
+                <div th:if="${config}">
+                    <div class="alert alert-success">
+                        <h4>Active Model: 
+                            <span th:text="${config.active_model.type}">MLP</span>
+                            <span class="badge bg-warning text-dark sampling-badge" 
+                                  th:text="${config.active_model.sampling}">original</span>
+                        </h4>
+                    </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h5>Model Details:</h5>
+                            <table class="table table-striped">
+                                <tbody>
+                                    <tr th:each="entry : ${config}" th:if="${entry.key != 'available_models' && entry.key != 'status'}">
+                                        <th th:text="${entry.key}">Key</th>
+                                        <td th:text="${entry.value}">Value</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5>System Info:</h5>
+                            <table class="table table-striped">
+                                <tbody>
+                                    <tr>
+                                        <th>API Version</th>
+                                        <td th:text="${config.api_version}">1.0</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Available Models</th>
+                                        <td th:text="${config.available_models?.size() ?: 0}">20</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Status</th>
+                                        <td>
+                                            <span class="badge bg-success" th:if="${config.status == 'success'}">Running</span>
+                                            <span class="badge bg-danger" th:unless="${config.status == 'success'}">Error</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Model Comparison Section -->
+                    <h4 class="mt-5 mb-3">Model Comparison</h4>
+                    
+                    <!-- Filter Controls -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="metricSelect" class="form-label">Compare by Metric:</label>
+                            <select class="form-select" id="metricSelect">
+                                <option value="f1_score">F1 Score</option>
+                                <option value="accuracy">Accuracy</option>
+                                <option value="precision">Precision</option>
+                                <option value="recall">Recall</option>
+                                <option value="roc_auc">ROC AUC</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="sortOrder" class="form-label">Sort Order:</label>
+                            <select class="form-select" id="sortOrder">
+                                <option value="desc">Highest to Lowest</option>
+                                <option value="asc">Lowest to Highest</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Model Cards -->
+                    <div class="row" id="modelCards">
+                        <div class="col-md-6 mb-3" th:each="model : ${config.available_models}">
+                            <div class="card model-card h-100" th:classappend="${model.type == config.active_model.type && model.sampling == config.active_model.sampling ? 'active' : ''}">
+                                <div class="card-header" th:classappend="${model.type == 'CNN' ? 'bg-primary text-white' : 
+                                                           model.type == 'MLP' ? 'bg-success text-white' : 
+                                                           model.type == 'RNN' ? 'bg-danger text-white' :
+                                                           model.type == 'GRU' ? 'bg-warning' : 
+                                                           'bg-secondary text-white'}">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h5 th:text="${model.type}">CNN</h5>
+                                        <span class="badge bg-light text-dark sampling-badge" th:text="${model.sampling}">smote</span>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <!-- F1 Score -->
+                                    <div class="mb-2">
+                                        <div class="d-flex justify-content-between">
+                                            <span>F1 Score:</span>
+                                            <span th:text="${#numbers.formatDecimal(model.f1_score * 100, 1, 1) + '%'}">87.5%</span>
+                                        </div>
+                                        <div class="metric-bar-container">
+                                            <div class="metric-bar bg-success"
+                                                 th:style="'width: ' + ${model.f1_score * 100} + '%'">
+                                                <span th:text="${#numbers.formatDecimal(model.f1_score * 100, 0, 0) + '%'}">87%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Accuracy -->
+                                    <div class="mb-2">
+                                        <div class="d-flex justify-content-between">
+                                            <span>Accuracy:</span>
+                                            <span th:text="${#numbers.formatDecimal(model.accuracy * 100, 1, 1) + '%'}">92.3%</span>
+                                        </div>
+                                        <div class="metric-bar-container">
+                                            <div class="metric-bar bg-primary"
+                                                 th:style="'width: ' + ${model.accuracy * 100} + '%'">
+                                                <span th:text="${#numbers.formatDecimal(model.accuracy * 100, 0, 0) + '%'}">92%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Precision & Recall -->
+                                    <div class="row mb-2">
+                                        <div class="col-6">
+                                            <small>Precision: <span th:text="${#numbers.formatDecimal(model.precision * 100, 1, 1) + '%'}">88.7%</span></small>
+                                        </div>
+                                        <div class="col-6">
+                                            <small>Recall: <span th:text="${#numbers.formatDecimal(model.recall * 100, 1, 1) + '%'}">85.2%</span></small>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- ROC AUC -->
+                                    <div class="mb-2">
+                                        <small>ROC AUC: <span th:text="${#numbers.formatDecimal(model.roc_auc * 100, 1, 1) + '%'}">94.6%</span></small>
+                                    </div>
+                                    
+                                    <div th:if="${model.type == config.active_model.type && model.sampling == config.active_model.sampling}" class="mt-2">
+                                        <span class="badge bg-info">Currently Active</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <a href="/classification" class="btn btn-primary">Go to Classification</a>
+                    </div>
+                </div>
+                
+                <div th:unless="${config}" class="alert alert-danger">
+                    <p>Unable to retrieve model configuration. Please ensure the Python service is running.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const metricSelect = document.getElementById('metricSelect');
+            const sortOrder = document.getElementById('sortOrder');
+            const modelCards = document.getElementById('modelCards');
+            
+            function sortCards() {
+                const metric = metricSelect.value;
+                const order = sortOrder.value;
+                
+                // Get all model cards
+                const cards = Array.from(modelCards.children);
+                
+                // Sort cards by the selected metric
+                cards.sort((a, b) => {
+                    // Extract the metric value from the card
+                    let metricA, metricB;
+                    
+                    if (metric === 'f1_score' || metric === 'accuracy') {
+                        // These metrics have visual bars
+                        const metricElementA = a.querySelector(`[class*="metric-bar"]:nth-of-type(${metric === 'f1_score' ? 1 : 2})`);
+                        const metricElementB = b.querySelector(`[class*="metric-bar"]:nth-of-type(${metric === 'f1_score' ? 1 : 2})`);
+                        
+                        metricA = parseFloat(metricElementA.style.width) / 100;
+                        metricB = parseFloat(metricElementB.style.width) / 100;
+                    } else {
+                        // Other metrics are in small text
+                        const metrics = ['precision', 'recall', 'roc_auc'];
+                        const index = metrics.indexOf(metric);
+                        
+                        if (index !== -1) {
+                            const smallElementsA = a.querySelectorAll('small');
+                            const smallElementsB = b.querySelectorAll('small');
+                            
+                            const textA = smallElementsA[index].textContent;
+                            const textB = smallElementsB[index].textContent;
+                            
+                            metricA = parseFloat(textA.match(/\d+\.\d+/)[0]) / 100;
+                            metricB = parseFloat(textB.match(/\d+\.\d+/)[0]) / 100;
+                        }
+                    }
+                    
+                    // Sort based on order
+                    return order === 'desc' ? metricB - metricA : metricA - metricB;
+                });
+                
+                // Rearrange the cards
+                cards.forEach(card => modelCards.appendChild(card));
+            }
+            
+            // Add event listeners to the filters
+            metricSelect.addEventListener('change', sortCards);
+            sortOrder.addEventListener('change', sortCards);
+            
+            // Initial sort
+            sortCards();
+        });
+    </script>
+</body>
+</html>
