@@ -1,6 +1,7 @@
 package com.earthquake.services;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -13,6 +14,10 @@ public class PredictionService {
 
     private final WebClient pythonServiceClient;
 
+    // carry the full Map<String,Object> generic type through to runtime
+    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE_REF =
+        new ParameterizedTypeReference<Map<String, Object>>() {};
+
     /**
      * Get model configuration from Python service
      */
@@ -20,7 +25,7 @@ public class PredictionService {
         return pythonServiceClient.get()
                 .uri("/config")
                 .retrieve()
-                .bodyToMono(Map.class);
+                .bodyToMono(MAP_TYPE_REF);
     }
 
     /**
@@ -31,9 +36,9 @@ public class PredictionService {
                 .uri("/predict")
                 .bodyValue(request)
                 .retrieve()
-                .bodyToMono(Map.class);
+                .bodyToMono(MAP_TYPE_REF);
     }
-    
+
     /**
      * Get available models from Python service
      */
@@ -41,9 +46,9 @@ public class PredictionService {
         return pythonServiceClient.get()
                 .uri("/models")
                 .retrieve()
-                .bodyToMono(Map.class);
+                .bodyToMono(MAP_TYPE_REF);
     }
-    
+
     /**
      * Activate a different model
      */
@@ -52,6 +57,6 @@ public class PredictionService {
                 .uri("/models/activate")
                 .bodyValue(request)
                 .retrieve()
-                .bodyToMono(Map.class);
+                .bodyToMono(MAP_TYPE_REF);
     }
 }
